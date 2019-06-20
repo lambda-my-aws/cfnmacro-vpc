@@ -1,0 +1,98 @@
+---
+# TEMPLATE GENERATED VIA COOKIECUTTER. ADAPT ACCORDINGLY
+
+Transform:
+  - AWS::Serverless-2016-10-31
+
+Conditions:
+  ReleaseAlias: !Equals
+    - !Ref 'ReleaseNewAlias'
+    - 'True'
+Description: Template for function cfnmacro-vpc
+Parameters:
+  NewAliasName:
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+    Type: String
+  ReleaseNewAlias:
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+    Type: String
+Resources:
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: cfnmacro-vpc.zip
+      AutoPublishAlias: live
+      Environment:
+        Variables:
+          Key: Value
+      Handler: function.lambda_handler
+      Layers:
+        - arn:aws:lambda:eu-west-1:373709687836:layer:ozone:9
+      MemorySize: 256
+      Role: !GetAtt 'LambdaFunctionRole.Arn'
+      Runtime: python3.7
+      Timeout: 15
+      FunctionName: !Ref 'AWS::NoValue'
+  LambdaFunctionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+    Type: AWS::IAM::Role
+  # LambdaVersion:
+  #   Type: AWS::Lambda::Version
+  #   DependsOn:
+  #     - LambdaFunction
+  #   Properties:
+  #     FunctionName: !GetAtt 'LambdaFunction.Arn'
+  CfnLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '${AWS::StackName}-cfnmacro-vpc'
+      RetentionInDays: 14
+  CfnLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: 'AllowLoggingForMacro'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - logs:PutLogEvents
+                  - logs:CreateLogStream
+                Effect: Allow
+                Resource: [ !GetAtt 'CfnLogGroup.Arn' ]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - !Sub 'cloudformation.${AWS::URLSuffix}'
+        Version: '2012-10-17'
+
+  CfnMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: Macro to create a new VPC
+      FunctionName: !Sub '${LambdaFunction.Arn}:live'
+      LogGroupName: !Ref CfnLogGroup
+      LogRoleARN: !GetAtt 'CfnLogRole.Arn'
+      Name: cfnmacro-vpc
